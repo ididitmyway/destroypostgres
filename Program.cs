@@ -15,14 +15,17 @@ namespace PostgreSQL
     {
         static void Main(string[] args)
         {
-            int repeat = 100;
-            for (int i = 1; i < repeat; i++)
-            {  
-                SampleConnection(i);
+            int repeat = 1;
+            for (int i = 1; i <= repeat; i++)
+            {
+                Random rnd = new Random();
+                
+                SampleConnection(rnd.Next(1, 20));
             }
+        
         }
 
-        static void SampleConnection(int i
+        static void SampleConnection(int randomInt
             
             )
         {
@@ -48,8 +51,8 @@ namespace PostgreSQL
 
                     try
                     {
-                        BaseSample(connection);
-                        TransactionSample(connection, i);
+                        //BaseSample(connection);
+                        TransactionSample(connection, randomInt);
 
                     }
                     catch (Exception)
@@ -62,7 +65,7 @@ namespace PostgreSQL
         }
 
 
-        static void TransactionSample(NpgsqlConnection connection, int safePointNumber)
+        static void TransactionSample(NpgsqlConnection connection, int randomInt)
         {
             try
             {
@@ -76,23 +79,33 @@ namespace PostgreSQL
             }
 
             // Begin Transaction V1/4
+            string randomTableName = "DemoTable" + randomInt.ToString(); //  " + randomTableName + "
             NpgsqlTransaction SampleTransaction = connection.BeginTransaction();
-
+            ExecuteCommand(connection, "DROP TABLE IF EXISTS " + randomTableName);
+            ExecuteCommand(connection, "CREATE TABLE " + randomTableName + "(id serial PRIMARY KEY, firstName VARCHAR(50), lastName VARCHAR(50))");
+            ExecuteCommandAddValues(connection, "INSERT INTO " + randomTableName + @" (firstName, lastName)
+                                                      VALUES (@firstName1, @lastName1), 
+                                                             (@firstName2, @lastName2), 
+                                                             (@firstName3, @lastName3)",
+                                                             new[] { ("firstName1", "Tarry"), ("lastName1", "Totter"),
+                                                                     ("firstName2", "Tahra"), ("lastName2", "Tumess"),
+                                                                     ("firstName3", "Tobby"), ("lastName3", "Totter") });
+           
             try
             {
-                SampleTransaction.Save("Testsafepoint" + safePointNumber.ToString());
-
+                SampleTransaction.Save("Testsafepoint" + randomInt.ToString());
             }
             catch (Exception)
             {
-                //Do nothing
+               // Do nothing
                // throw;
             }
             
+           
 
-// UserInput
-// Type your username and press enter
-            Console.WriteLine("You can enter anything");
+            // UserInput
+            // Type your username and press enter
+            Console.WriteLine("You can enter anything. e.g. Totter");
 
             // Create a string variable and get user input from the keyboard and store it in the variable
             string anyThing = Console.ReadLine();
@@ -108,6 +121,17 @@ namespace PostgreSQL
 
             //https://www.postgresql.org/docs/current/static/sql-copy.html
             //connection.BeginTextImport
+            using (var command = new NpgsqlCommand($"SELECT * FROM " + randomTableName + " WHERE lastName = (@p1)", connection)) // Commands can be batched = parallel requests
+            {
+                command.Parameters.AddWithValue("p1", anyThing);
+                using (NpgsqlDataReader dr = command.ExecuteReader())
+                {
+                    while (dr.Read()) { Console.WriteLine(dr[1]); }
+                    dr.DisposeAsync().GetAwaiter().GetResult();
+                }
+            }
+
+            connection.Close();
 
 
 
